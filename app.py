@@ -7,67 +7,130 @@ from prompts import (
     get_tailored_resume_prompt,
     get_cover_letter_prompt
 )
-from datetime import date
+from datetime import datetime, date
+import uuid
 
 # -----------------------------
 # Page Config
 # -----------------------------
 st.set_page_config(
-    page_title="JobFit AI – Smart Resume Tailor",
+    page_title="JobFit AI",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # -----------------------------
-# Custom CSS
+# Stylish CSS
 # -----------------------------
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
     .stApp {
-        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
+        color: #e2e8f0;
     }
-    h1 {
-        color: #0f172a !important;
-        font-weight: 800 !important;
-        font-size: 2.3rem !important;
+
+    h1, h2, h3, h4 {
+        color: #f8fafc !important;
+        font-weight: 700 !important;
     }
+
+    p, label, .stMarkdown {
+        color: #cbd5e1 !important;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: rgba(15, 23, 42, 0.95) !important;
+        border-right: 1px solid #334155;
+    }
+
+    /* Buttons */
     .stButton > button {
-        background: linear-gradient(90deg, #4f46e5, #7c3aed) !important;
+        background: linear-gradient(90deg, #6366f1, #8b5cf6) !important;
         color: white !important;
         border: none !important;
         border-radius: 12px !important;
-        padding: 0.8rem 1.6rem !important;
+        padding: 0.75rem 1.5rem !important;
         font-weight: 600 !important;
-        box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35) !important;
+        transition: all 0.25s ease !important;
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
     }
+
     .stButton > button:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 8px 25px rgba(79, 70, 229, 0.45) !important;
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5) !important;
     }
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%) !important;
+
+    /* Input fields */
+    .stTextInput input, .stTextArea textarea, .stSelectbox div {
+        background-color: #1e293b !important;
+        color: #f1f5f9 !important;
+        border: 1px solid #334155 !important;
+        border-radius: 10px !important;
     }
-    section[data-testid="stSidebar"] * {
-        color: #e0e7ff !important;
-    }
+
+    /* Metric */
     [data-testid="stMetricValue"] {
         color: #a5b4fc !important;
-        font-size: 1.8rem !important;
+        font-size: 1.7rem !important;
     }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+
+    /* File uploader */
+    [data-testid="stFileUploader"] {
+        background: #1e293b;
+        border-radius: 12px;
+        border: 1px dashed #6366f1;
+        padding: 1rem;
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1e293b;
+        border-radius: 10px;
+        color: #94a3b8;
+        border: 1px solid #334155;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(90deg, #6366f1, #8b5cf6) !important;
+        color: white !important;
+    }
+
+    /* Hide branding */
+    #MainMenu, footer, header {visibility: hidden;}
+
+    /* History cards */
+    .history-card {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .history-card:hover {
+        border-color: #6366f1;
+        background: #312e81;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# Payment & Usage Settings
+# Settings
 # -----------------------------
 FREE_LIMIT = 3
-PRO_ACCESS_CODE = "JOBFIT-PRO-2026"   # Change this code later if you want
+PRO_ACCESS_CODE = "JOBFIT-PRO-2026"
 CHECKOUT_LINK = "https://jobfitai.lemonsqueezy.com/checkout/buy/4f8d5a00-09e7-4d9d-aac8-a51d62e1c2a2"
 
+# Session helpers
 def get_today_key():
     return f"usage_{date.today().isoformat()}"
 
@@ -86,29 +149,27 @@ def can_generate():
         return True
     return get_usage_count() < FREE_LIMIT
 
-# -----------------------------
-# Header
-# -----------------------------
-st.markdown("""
-<div style="display:flex; align-items:center; gap:12px; margin-bottom: 8px;">
-    <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); 
-                width:48px; height:48px; border-radius:12px; 
-                display:flex; align-items:center; justify-content:center;
-                font-size:24px;">🎯</div>
-    <h1 style="margin:0; padding:0;">JobFit AI</h1>
-</div>
-""", unsafe_allow_html=True)
+# Initialize history
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-st.markdown("##### Tailor your resume to any job description in seconds")
-st.caption("Upload your resume + paste a job description → Get match score, tailored resume & cover letter")
+if "user_name" not in st.session_state:
+    st.session_state.user_name = ""
 
 # -----------------------------
 # Sidebar
 # -----------------------------
 with st.sidebar:
+    st.markdown("### 👤 Sign In")
+    name = st.text_input("Your Name", value=st.session_state.user_name, placeholder="Enter your name")
+    if name:
+        st.session_state.user_name = name
+        st.success(f"Welcome, {name}!")
+
+    st.markdown("---")
     st.markdown("### ⚙️ Settings")
 
-    api_key = st.text_input("API Key (Groq recommended)", type="password", placeholder="gsk_...")
+    api_key = st.text_input("API Key (Groq)", type="password", placeholder="gsk_...")
     
     provider = st.selectbox("Provider", ["Groq", "OpenAI", "OpenRouter"], index=0)
 
@@ -123,40 +184,64 @@ with st.sidebar:
         base_url = "https://openrouter.ai/api/v1"
 
     st.markdown("---")
-    
-    # Pro Access Code
     st.markdown("### 🔑 Pro Access")
-    pro_code = st.text_input("Enter Pro Access Code", type="password", placeholder="Enter code after payment")
+    pro_code = st.text_input("Pro Access Code", type="password", placeholder="Enter after payment")
     
     if pro_code == PRO_ACCESS_CODE:
         st.session_state["is_pro"] = True
-        st.success("✅ Pro Access Unlocked!")
+        st.success("✅ Pro Unlocked!")
     elif pro_code:
         st.error("Invalid code")
 
     st.markdown("---")
     
     if is_pro_user():
-        st.success("🚀 You are a Pro user (Unlimited)")
+        st.success("🚀 Pro User (Unlimited)")
     else:
         remaining = max(0, FREE_LIMIT - get_usage_count())
-        st.metric("Free Generations Left", f"{remaining} / {FREE_LIMIT}")
-        
+        st.metric("Free Left Today", f"{remaining}/{FREE_LIMIT}")
         if remaining == 0:
-            st.warning("Daily free limit reached")
-            st.link_button("💎 Upgrade to Pro – ₹799/month", CHECKOUT_LINK, use_container_width=True)
+            st.link_button("💎 Upgrade to Pro (₹799/mo)", CHECKOUT_LINK, use_container_width=True)
 
+    # History Section
     st.markdown("---")
-    st.caption("Recommended: Use Groq + llama-3.3-70b-versatile")
+    st.markdown("### 📜 History")
+    
+    if st.session_state.history:
+        for i, item in enumerate(reversed(st.session_state.history[-8:])):  # show last 8
+            label = f"{item['time']} • {item['preview']}"
+            if st.button(label, key=f"hist_{i}", use_container_width=True):
+                st.session_state["last_analysis"] = item["analysis"]
+                st.session_state["last_resume"] = item["resume"]
+                st.session_state["last_cover"] = item["cover"]
+                st.rerun()
+    else:
+        st.caption("No history yet")
 
 # -----------------------------
-# Main Content
+# Main Header
+# -----------------------------
+st.markdown("""
+<div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
+    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); 
+                width:52px; height:52px; border-radius:14px; 
+                display:flex; align-items:center; justify-content:center;
+                font-size:26px; box-shadow: 0 4px 15px rgba(99,102,241,0.4);">🎯</div>
+    <div>
+        <h1 style="margin:0; padding:0; font-size:2.2rem;">JobFit AI</h1>
+        <p style="margin:0; color:#94a3b8; font-size:0.95rem;">Tailor your resume in seconds</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# -----------------------------
+# Input Area
 # -----------------------------
 col1, col2 = st.columns(2, gap="large")
 
 with col1:
     st.markdown("#### 📄 Your Resume")
-    uploaded_file = st.file_uploader("Upload PDF Resume", type=["pdf"])
+    uploaded_file = st.file_uploader("Upload PDF", type=["pdf"], label_visibility="collapsed")
     
     resume_text = ""
     if uploaded_file:
@@ -164,24 +249,25 @@ with col1:
             resume_text = extract_text_from_pdf(uploaded_file)
         if resume_text and not resume_text.startswith("Error"):
             with st.expander("View extracted text"):
-                st.text_area("", resume_text, height=200, label_visibility="collapsed")
+                st.text_area("", resume_text, height=180, label_visibility="collapsed")
 
 with col2:
     st.markdown("#### 💼 Job Description")
-    job_description = st.text_area("Paste the full job description", height=280,
-                                   placeholder="Copy the entire job posting here...")
+    job_description = st.text_area("Paste job description", height=260, 
+                                   placeholder="Paste the full job posting here...",
+                                   label_visibility="collapsed")
     company_name = st.text_input("Company Name (optional)", value="the company")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Generate Button
+# Generate
 if not can_generate():
-    st.warning("You have reached the free daily limit.")
-    st.link_button("💎 Upgrade to Pro – Unlimited Access (₹799/month)", CHECKOUT_LINK, use_container_width=True)
+    st.warning("Free daily limit reached.")
+    st.link_button("💎 Upgrade to Pro – Unlimited Access", CHECKOUT_LINK, use_container_width=True)
 else:
-    if st.button("🚀 Analyze & Generate Tailored Resume", type="primary", use_container_width=True):
+    if st.button("🚀 Analyze & Generate", type="primary", use_container_width=True):
         if not api_key:
-            st.error("Please enter your API key in the sidebar.")
+            st.error("Please enter your API key.")
         elif not resume_text or resume_text.startswith("Error"):
             st.error("Please upload a valid PDF resume.")
         elif not job_description.strip():
@@ -196,25 +282,21 @@ else:
             status = st.empty()
 
             try:
-                status.info("📊 Analyzing match score...")
+                status.info("📊 Analyzing match...")
                 progress.progress(25)
                 analysis = client.chat.completions.create(
                     model=model,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": get_analysis_prompt(resume_text, job_description)}
-                    ],
+                    messages=[{"role": "system", "content": SYSTEM_PROMPT},
+                              {"role": "user", "content": get_analysis_prompt(resume_text, job_description)}],
                     temperature=0.3
                 ).choices[0].message.content
 
-                status.info("📝 Rewriting your resume...")
+                status.info("📝 Rewriting resume...")
                 progress.progress(55)
                 tailored = client.chat.completions.create(
                     model=model,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": get_tailored_resume_prompt(resume_text, job_description)}
-                    ],
+                    messages=[{"role": "system", "content": SYSTEM_PROMPT},
+                              {"role": "user", "content": get_tailored_resume_prompt(resume_text, job_description)}],
                     temperature=0.4
                 ).choices[0].message.content
 
@@ -222,18 +304,27 @@ else:
                 progress.progress(85)
                 cover = client.chat.completions.create(
                     model=model,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": get_cover_letter_prompt(resume_text, job_description, company_name)}
-                    ],
+                    messages=[{"role": "system", "content": SYSTEM_PROMPT},
+                              {"role": "user", "content": get_cover_letter_prompt(resume_text, job_description, company_name)}],
                     temperature=0.5
                 ).choices[0].message.content
 
                 progress.progress(100)
                 status.success("✅ Done!")
-                
+
                 if not is_pro_user():
                     increment_usage()
+
+                # Save to history
+                preview = (job_description[:40] + "...") if len(job_description) > 40 else job_description
+                st.session_state.history.append({
+                    "id": str(uuid.uuid4()),
+                    "time": datetime.now().strftime("%H:%M"),
+                    "preview": preview,
+                    "analysis": analysis,
+                    "resume": tailored,
+                    "cover": cover
+                })
 
                 st.session_state["last_analysis"] = analysis
                 st.session_state["last_resume"] = tailored
@@ -245,9 +336,9 @@ else:
 # Results
 if "last_analysis" in st.session_state:
     st.markdown("---")
-    st.markdown("### 🎉 Your Results")
+    st.markdown("### 🎉 Results")
 
-    tab1, tab2, tab3 = st.tabs(["📊 Match Analysis", "📝 Tailored Resume", "✉️ Cover Letter"])
+    tab1, tab2, tab3 = st.tabs(["📊 Analysis", "📝 Tailored Resume", "✉️ Cover Letter"])
 
     with tab1:
         st.markdown(st.session_state["last_analysis"])
@@ -276,5 +367,4 @@ if "last_analysis" in st.session_state:
             except:
                 pass
 
-st.markdown("---")
-st.markdown("<div style='text-align:center; color:#64748b;'>Built with ❤️ • JobFit AI</div>", unsafe_allow_html=True)
+st.markdown("<br><div style='text-align:center; color:#64748b; font-size:0.85rem;'>JobFit AI • Built for job seekers</div>", unsafe_allow_html=True)
